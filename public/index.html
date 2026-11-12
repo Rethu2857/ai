@@ -1,0 +1,93 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ACPA - AI Complaint Priority Assistant</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script></head>
+<body class="bg-slate-950 text-slate-200 min-h-screen"><div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect}=React;
+let TOKEN=localStorage.getItem('tok')||'';
+const api=(p,m='GET',b)=>fetch('/api'+p,{method:m,headers:{'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},body:b&&JSON.stringify(b)}).then(r=>r.json());
+const PC={Critical:'bg-red-700',High:'bg-orange-600',Medium:'bg-yellow-600',Low:'bg-green-600'};
+const left=d=>{const m=Math.round((new Date(d)-Date.now())/6e4);if(m<0)return'OVERDUE';return m<60?m+' min left':m<1440?Math.floor(m/60)+' h '+m%60+' min left':Math.floor(m/1440)+' days left'};
+const Badge=({p})=><span className={`${PC[p]} text-xs font-bold px-2 py-0.5 rounded-full`}>{p.toUpperCase()}</span>;
+const Card=({children,className=''})=><div className={`bg-slate-900 border border-slate-800 rounded-xl p-4 ${className}`}>{children}</div>;
+const In=p=><input {...p} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mb-3 text-sm"/>;
+const Btn=({children,...p})=><button {...p} className={`bg-gradient-to-r from-cyan-400 to-sky-600 text-slate-950 font-bold rounded-lg px-4 py-2 text-sm ${p.className||''}`}>{children}</button>;
+
+function Auth({onLogin}){const[reg,setReg]=useState(false),[f,setF]=useState({email:'',password:'',role:'complainant'}),[err,setErr]=useState('');
+ const s=k=>e=>setF({...f,[k]:e.target.value});
+ const go=async()=>{const r=await api(reg?'/auth/register':'/auth/login','POST',f);if(r.error)return setErr(r.error);TOKEN=r.token;localStorage.setItem('tok',TOKEN);onLogin(r.user)};
+ return <div className="max-w-sm mx-auto pt-16 px-4"><h1 className="text-cyan-400 font-bold text-xl">AI Complaint Priority Assistant</h1><p className="text-xs text-slate-400 mb-6">NLP · Machine Learning · Smart Triage</p>
+ <Card><h2 className="text-2xl font-bold mb-4">{reg?'Create Account':'Welcome Back'}</h2>
+ {reg&&<><In placeholder="Full name" onChange={s('name')}/><In placeholder="Mobile (10 digits)" onChange={s('mobile')}/></>}
+ <In placeholder="Email" onChange={s('email')}/><In type="password" placeholder="Password" onChange={s('password')}/>
+ {reg&&<select onChange={s('role')} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mb-3 text-sm"><option value="complainant">Complainant</option><option value="admin">Admin</option></select>}
+ {err&&<p className="text-red-400 text-sm mb-2">{err}</p>}<Btn className="w-full" onClick={go}>{reg?'Create Account':'Login'}</Btn>
+ <p className="text-center text-sm text-cyan-400 mt-3 cursor-pointer" onClick={()=>{setReg(!reg);setErr('')}}>{reg?'Have an account? Login':'New here? Create Account →'}</p></Card>
+ <p className="text-xs text-slate-500 mt-4 text-center">Demo: admin@demo.com / admin123 · user@demo.com / user123</p></div>}
+
+function NewComplaint({onDone,onClose}){const[f,setF]=useState({title:'',description:'',category:'General',location:'',image:''}),[ai,setAi]=useState(null);
+ const s=k=>e=>setF({...f,[k]:e.target.value});
+ return <Card className="mb-4"><div className="flex justify-between mb-3"><b>New Complaint</b><span className="cursor-pointer" onClick={onClose}>✕</span></div>
+ <In placeholder="Title" value={f.title} onChange={s('title')}/><textarea placeholder="Description" value={f.description} onChange={s('description')} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mb-3 text-sm h-20"/>
+ <select value={f.category} onChange={s('category')} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mb-3 text-sm">{['General','Water','Electricity','Sanitation','Roads','Safety'].map(c=><option key={c}>{c}</option>)}</select>
+ <In placeholder="Location" value={f.location} onChange={s('location')}/><In placeholder="Image URL (optional)" value={f.image} onChange={s('image')}/>
+ <button className="w-full border border-cyan-400 text-cyan-400 rounded-lg py-2 text-sm mb-2" onClick={async()=>setAi(await api('/analyze','POST',f))}>Analyze with AI</button>
+ {ai&&<div className="bg-slate-950 rounded-lg p-3 mb-3 text-sm"><div className="flex justify-between items-center"><Badge p={ai.priority}/><b className="text-cyan-400 text-xl">{ai.confidence}%</b></div>
+  <p className="mt-2">Category: <b>{ai.category}</b></p><p>Sentiment: <span className="text-red-400">{ai.sentiment}</span></p>
+  <div className="my-2 flex flex-wrap gap-1">{ai.keywords.map(k=><span key={k} className="bg-cyan-900 text-xs px-2 rounded">{k}</span>)}</div><p className="text-slate-400">{ai.explanation}</p></div>}
+ <Btn className="w-full" onClick={async()=>{if(!f.title||!f.description)return alert('Title and description required');await api('/complaints','POST',f);onDone()}}>Submit Complaint</Btn></Card>}
+
+function Complaints({user}){const[list,setList]=useState([]),[show,setShow]=useState(false),[sel,setSel]=useState(null),admin=user.role==='admin';
+ const load=()=>api('/complaints').then(setList);useEffect(load,[]);
+ const cnt=p=>list.filter(c=>c.priority===p).length;
+ return <div>{admin?<><h2 className="font-bold text-lg mb-2">Priority Queue</h2><div className="grid grid-cols-4 gap-2 mb-3 text-center">
+  {['Critical','High','Medium','Low'].map(p=><Card key={p} className="!p-2"><div className="text-xl font-bold">{cnt(p)}</div><div className="text-xs text-slate-400">{p}</div></Card>)}</div></>
+  :<div className="flex justify-between mb-3"><h2 className="font-bold text-lg">My Complaints</h2><Btn onClick={()=>setShow(true)}>+ New Complaint</Btn></div>}
+ {show&&<NewComplaint onClose={()=>setShow(false)} onDone={()=>{setShow(false);load()}}/>}
+ {list.map(c=><Card key={c.id} className="mb-2 cursor-pointer" ><div onClick={()=>setSel(sel===c.id?null:c.id)}>
+  <div className="flex justify-between"><Badge p={c.priority}/>{admin&&c.status!=='Resolved'&&<span className={`text-xs ${left(c.deadline)==='OVERDUE'||c.priority==='Critical'?'text-red-400':'text-slate-400'}`}>{left(c.deadline)}</span>}</div>
+  <p className="font-bold mt-1">{c.title}</p><p className="text-xs text-slate-400">{c.description}</p>
+  <p className="text-xs text-slate-500 mt-1">{c.id} · {c.category} · {c.userName} · Status: {c.status} · AI {c.confidence}%</p></div>
+  {sel===c.id&&(admin?<Admin c={c} done={()=>{setSel(null);load()}}/>:<p className="text-xs mt-2 text-cyan-300">AI: {c.explanation}</p>)}</Card>)}
+ {!list.length&&<p className="text-slate-500 text-sm">No complaints yet.</p>}</div>}
+
+function Admin({c,done}){const[o,setO]=useState(c.officer||''),[st,setSt]=useState(c.status),[r,setR]=useState(c.remarks||'');
+ return <div className="mt-3 border-t border-slate-800 pt-3"><p className="text-xs mb-2 text-cyan-300">AI: {c.explanation}</p>
+ <select value={o} onChange={e=>setO(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mb-2 text-sm"><option value="">Assign officer</option>{['Mr. Kumar — Fire & Safety','Ms. Priya — Water Board','Mr. Ravi — Electricity','Ms. Anitha — Sanitation'].map(x=><option key={x}>{x}</option>)}</select>
+ <select value={st} onChange={e=>setSt(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mb-2 text-sm">{['Submitted','Under Review','Assigned','In Progress','Resolved'].map(x=><option key={x}>{x}</option>)}</select>
+ <In placeholder="Remarks" value={r} onChange={e=>setR(e.target.value)}/><Btn onClick={async()=>{await api('/complaints/'+c.id,'PUT',{officer:o,status:st,remarks:r});done()}}>Save & Notify Complainant</Btn></div>}
+
+function Track(){const[l,setL]=useState([]),[i,setI]=useState(0);useEffect(()=>{api('/complaints').then(setL)},[]);const c=l[i];
+ const stages=['Submitted','Under Review','Assigned','In Progress','Resolved'];
+ return <div><h2 className="font-bold text-lg mb-2">Track Complaint</h2>{!c?<p className="text-slate-500 text-sm">Nothing to track.</p>:<>
+ <select value={i} onChange={e=>setI(+e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 mb-3 text-sm">{l.map((x,k)=><option key={x.id} value={k}>{x.id} — {x.title}</option>)}</select>
+ <Card><Badge p={c.priority}/> <b className="ml-2">{c.title}</b>{c.officer&&<p className="text-xs mt-1 text-slate-400">Officer: {c.officer}</p>}{c.remarks&&<p className="text-xs text-slate-400">Remarks: {c.remarks}</p>}
+ <div className="mt-4">{c.history.map((h,k)=><div key={k} className="flex gap-3 mb-3"><span className="w-3 h-3 rounded-full bg-cyan-400 mt-1"/><div><p className="text-sm font-bold">{h.s}</p><p className="text-xs text-slate-500">{new Date(h.t).toLocaleString()}</p></div></div>)}
+ {stages.slice(stages.indexOf(c.status)+1).map(s=><div key={s} className="flex gap-3 mb-3 opacity-50"><span className="w-3 h-3 rounded-full border border-cyan-400 mt-1"/><p className="text-sm">{s}</p></div>)}</div></Card></>}</div>}
+
+function Analytics(){const[a,setA]=useState(null);useEffect(()=>{api('/analytics').then(setA)},[]);if(!a)return null;
+ const Bars=({d,col})=>{const m=Math.max(1,...Object.values(d));return Object.entries(d).map(([k,v])=><div key={k} className="flex items-center gap-2 text-xs mb-1"><span className="w-20">{k}</span><div className="flex-1 bg-slate-800 h-2 rounded"><div className={`${col} h-2 rounded`} style={{width:v/m*100+'%'}}/></div><span>{v}</span></div>)};
+ return <div><h2 className="font-bold text-lg mb-2">Analytics</h2><div className="grid grid-cols-2 gap-2 mb-3"><Card><p className="text-xs text-slate-400">Total complaints</p><p className="text-3xl font-bold text-cyan-400">{a.total}</p></Card>
+ <Card><p className="text-xs text-slate-400">Avg. resolution</p><p className="text-3xl font-bold text-green-400">{a.avgResolutionHours} h</p></Card></div>
+ <Card className="mb-2"><p className="text-xs text-slate-400 mb-2">By priority</p><Bars d={a.byPriority} col="bg-orange-500"/></Card><Card className="mb-2"><p className="text-xs text-slate-400 mb-2">By category</p><Bars d={a.byCategory} col="bg-cyan-400"/></Card><Card><p className="text-xs text-slate-400 mb-2">By status</p><Bars d={a.byStatus} col="bg-green-500"/></Card></div>}
+
+function Help(){const[n,setN]=useState([]),[m,setM]=useState([{b:1,t:"Hello! I'm ComplaintBot. I can help you submit a complaint, check its status or understand priority levels."}]),[q,setQ]=useState('');
+ useEffect(()=>{api('/notifications').then(setN)},[]);
+ const send=async()=>{if(!q)return;const r=await api('/chat','POST',{message:q});setM([...m,{t:q},{b:1,t:r.reply}]);setQ('')};
+ return <div><h2 className="font-bold text-lg mb-2">Notifications</h2>{n.map((x,i)=><Card key={i} className="mb-2 !p-3 text-sm">{x.msg}<p className="text-xs text-slate-500">{new Date(x.at).toLocaleString()}</p></Card>)}
+ <p className="text-xs text-slate-400 my-2">Helpline: <b className="text-cyan-400">1800-425-0001</b></p>
+ <h2 className="font-bold text-lg my-2">ComplaintBot — AI Assistant</h2><Card>{m.map((x,i)=><div key={i} className={`mb-2 text-sm p-2 rounded-lg ${x.b?'bg-slate-800':'bg-sky-900 ml-8'}`}>{x.t}</div>)}
+ <div className="flex gap-2"><input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Ask ComplaintBot..." className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm"/><Btn onClick={send}>➤</Btn></div></Card></div>}
+
+function App(){const[user,setUser]=useState(null),[tab,setTab]=useState('c');
+ useEffect(()=>{if(TOKEN)api('/me').catch(()=>{});try{const p=JSON.parse(atob(TOKEN.split('.')[1]));if(p.exp*1000>Date.now())setUser({id:p.id,name:p.name,role:p.role})}catch{}},[]);
+ if(!user)return <Auth onLogin={setUser}/>;
+ const tabs=[['c',user.role==='admin'?'Queue':'Complaints'],['t','Track'],['a','Analytics'],['h','Help']];
+ return <div className="max-w-md mx-auto p-4 pb-24"><div className="flex justify-between items-center mb-4"><b className="text-cyan-400">ACPA</b>
+  <span className="text-xs">{user.name} ({user.role}) · <a href="#" className="text-cyan-400" onClick={()=>{localStorage.removeItem('tok');TOKEN='';setUser(null)}}>Logout</a></span></div>
+  {tab==='c'&&<Complaints user={user}/>}{tab==='t'&&<Track/>}{tab==='a'&&<Analytics/>}{tab==='h'&&<Help/>}
+  <div className="fixed bottom-0 inset-x-0 bg-slate-900 border-t border-slate-800 flex justify-around py-3 max-w-md mx-auto">{tabs.map(([k,l])=><button key={k} onClick={()=>setTab(k)} className={`text-sm px-3 py-1 rounded ${tab===k?'bg-cyan-900 text-cyan-300':'text-slate-400'}`}>{l}</button>)}</div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>
