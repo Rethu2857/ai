@@ -6,6 +6,13 @@
 3. In this folder:  `npm install`  then  `npm start`
 4. Open http://localhost:3000  (internet needed once for the React/Tailwind CDN scripts)
 
+## Deploy to Vercel
+1. Import this GitHub repository in Vercel.
+2. Add `JWT_SECRET` in the Vercel project's Environment Variables for the environments you deploy.
+3. Deploy. The included `vercel.json` routes requests through the Express app.
+
+The demo stores data in a local JSON file, which is not persistent across Vercel serverless invocations. Use a hosted database for persistent production data.
+
 ## Demo accounts
 - Admin: admin@demo.com / admin123
 - Complainant: user@demo.com / user123

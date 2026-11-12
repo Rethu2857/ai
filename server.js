@@ -67,4 +67,8 @@ app.post('/api/chat',auth,(req,res)=>{const m=(req.body.message||'').toLowerCase
    m.includes('track')||m.includes('status')?'Open the Track tab and pick your complaint to see every stage from Submitted to Resolved.':
    m.includes('submit')||m.includes('register')?'Tap "+ New Complaint", fill the details, press "Analyze with AI" to preview the priority, then submit.':
    'I can help you submit a complaint, track its status or explain priority levels. What would you like to know?';res.json({reply:a})});
-app.listen(process.env.PORT||3000,()=>console.log('ACPA demo running at http://localhost:'+(process.env.PORT||3000)));
+if(require.main===module){
+  app.listen(process.env.PORT||3000,()=>console.log('ACPA demo running at http://localhost:'+(process.env.PORT||3000)));
+}
+
+module.exports=app;
