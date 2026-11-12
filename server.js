@@ -1,7 +1,8 @@
 // AI-Based Complaint Priority Assistant - demo backend (Express + JWT + bcrypt + rule/NLP priority engine)
 const express=require('express'),fs=require('fs'),path=require('path'),bcrypt=require('bcryptjs'),jwt=require('jsonwebtoken');
 const app=express();app.use(express.json());app.use(express.static(path.join(__dirname,'public')));
-const SECRET=process.env.JWT_SECRET,DB=path.join(__dirname,'data.json');
+const SECRET=process.env.JWT_SECRET;
+const DB=process.env.VERCEL?path.join('/tmp','data.json'):path.join(__dirname,'data.json');
 if(!SECRET)throw new Error('JWT_SECRET environment variable is required');
 let db=fs.existsSync(DB)?JSON.parse(fs.readFileSync(DB)):{users:[],complaints:[],notes:[],seq:146};
 const save=()=>fs.writeFileSync(DB,JSON.stringify(db,null,1));

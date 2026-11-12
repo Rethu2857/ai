@@ -11,7 +11,7 @@
 2. Add `JWT_SECRET` in the Vercel project's Environment Variables for the environments you deploy.
 3. Deploy. The included `vercel.json` routes requests through the Express app.
 
-The demo stores data in a local JSON file, which is not persistent across Vercel serverless invocations. Use a hosted database for persistent production data.
+The demo stores data in a local JSON file (`/tmp/data.json` on Vercel). Vercel's temporary storage is not persistent across serverless invocations, so use a hosted database for persistent production data.
 
 ## Demo accounts
 - Admin: admin@demo.com / admin123
